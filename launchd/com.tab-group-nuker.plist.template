@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.tab-group-nuker</string>
+  <key>ProgramArguments</key><array>
+    <string>/bin/bash</string>
+    <string>__HOME__/.tab-group-nuker/on-chrome-quit.sh</string>
+  </array>
+  <key>EnvironmentVariables</key><dict>
+    <key>PATH</key><string>__NODE_DIR__:/usr/local/bin:/usr/bin:/bin</string>
+  </dict>
+  <key>WatchPaths</key><array>
+    <string>__HOME__/Library/Application Support/Google/Chrome/SingletonLock</string>
+  </array>
+  <key>RunAtLoad</key><false/>
+  <key>StandardOutPath</key><string>__HOME__/.tab-group-nuker-backups/quit.log</string>
+  <key>StandardErrorPath</key><string>__HOME__/.tab-group-nuker-backups/quit.log</string>
+</dict></plist>

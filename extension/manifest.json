@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "Tab Group Nuker",
+  "version": "1.0.0",
+  "description": "Deletes every open tab group, clears restored groups at startup, and can auto-kill any group the moment it appears.",
+  "homepage_url": "https://github.com/yguooo/tab-group-nuker",
+  "permissions": ["tabs", "tabGroups", "storage"],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_popup": "popup.html", "default_title": "Tab Group Nuker" },
+  "commands": {
+    "nuke-open-groups": {
+      "suggested_key": { "default": "Ctrl+Shift+X", "mac": "Command+Shift+X" },
+      "description": "Delete all open tab groups"
+    }
+  }
+}

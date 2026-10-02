@@ -1,0 +1,11 @@
+{
+  "name": "tab-group-nuker",
+  "private": true,
+  "description": "Bulk-delete all Chrome saved tab groups, including closed ones, and keep them from piling up.",
+  "license": "MIT",
+  "repository": "github:yguooo/tab-group-nuker",
+  "type": "module",
+  "version": "1.0.0",
+  "scripts": { "list": "node wipe-saved-groups.mjs", "wipe": "node wipe-saved-groups.mjs" },
+  "dependencies": { "classic-level": "^3.0.0" }
+}

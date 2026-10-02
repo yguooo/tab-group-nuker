@@ -1,0 +1,21 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+  body { font: 13px system-ui; width: 300px; margin: 0; padding: 14px; color: #222; }
+  h1 { font-size: 15px; margin: 0 0 10px; }
+  button { width: 100%; padding: 9px; font-size: 13px; border: 0; border-radius: 6px; cursor: pointer; }
+  #nuke { background: #d93025; color: #fff; font-weight: 600; }
+  label { display: flex; gap: 8px; align-items: center; margin: 14px 0 6px; cursor: pointer; }
+  .hint { color: #666; font-size: 12px; line-height: 1.4; }
+  #out { margin-top: 8px; font-weight: 600; min-height: 1.2em; }
+</style></head>
+<body>
+  <h1>Tab Group Nuker</h1>
+  <div class="hint">Open groups right now: <b id="count">…</b></div>
+  <div id="out"></div>
+  <button id="nuke">Delete all open groups</button>
+  <label><input type="checkbox" id="auto"> <b>Auto-kill mode</b></label>
+  <div class="hint">While on, any group that gets opened is deleted instantly. Click each closed saved group in the tab-group menu (grid icon) to open it and it disappears for good.<br><br>
+  To wipe closed saved groups in bulk without clicking, quit Chrome and run <code>wipe-saved-groups.mjs</code> (see README).</div>
+  <script src="popup.js"></script>
+</body></html>
