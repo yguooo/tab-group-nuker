@@ -40,7 +40,7 @@ So the job is split in three parts. See [docs/INTERNALS.md](docs/INTERNALS.md) f
 
 | Part | What it does | Needs |
 |---|---|---|
-| `extension/` | Deletes all **open** groups on demand; ungroups whatever session-restore brings back at startup; optional auto-kill mode | Chrome, load unpacked |
+| `extension/` | Deletes all **open** groups on demand; ungroups whatever session-restore brings back at startup | Chrome, load unpacked |
 | `wipe-saved-groups.mjs` | Deletes all saved groups, **open or closed**, from the profile store on disk, with a backup | Node 20+, Chrome quit |
 | `launchd/` + `install.sh` | Runs the wipe automatically every time Chrome quits. No resident process | macOS |
 
@@ -58,11 +58,12 @@ group, the same as Chrome's own *Ungroup* menu item, just without the confirmati
 What you get:
 
 - Toolbar button → **Delete all open groups**, or press `⌘⇧X` / `Ctrl+Shift+X`.
-- On every Chrome start it ungroups the groups that session-restore brings back, over the first
-  20 seconds, so a launch always begins with zero groups.
-- **Auto-kill mode**: any group that appears is ungrouped instantly. Useful to clear closed saved
-  groups by clicking them one by one (each opens and vanishes) when you cannot quit Chrome. Leave it
-  **off** if you run an auto-grouping extension, otherwise the two fight.
+- On every Chrome start it keeps ungrouping, for two minutes, whatever session-restore brings back
+  (and whatever an auto-grouper re-creates as restored tabs load), so a launch always begins with
+  zero groups.
+
+Run `test/run.sh` to see the whole cycle against the real "Tab Groups Extension" in a throwaway
+Chrome for Testing profile (needs node and ~200 MB for the browser download).
 
 ### 2. Wipe script
 

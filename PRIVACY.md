@@ -6,11 +6,12 @@ Tab Group Nuker does not collect, store, or transmit any personal data.
 
 **What the extension accesses.** It uses the Chrome `tabs` and `tabGroups` permissions to list the
 tab groups open in your browser and to ungroup their tabs when you ask it to, or at browser
-startup, or when Auto-kill mode is on. It never reads page content and does not read, record,
+startup. It never reads page content and does not read, record,
 or transmit tab URLs or titles.
 
-**What the extension stores.** One setting, whether Auto-kill mode is on, saved locally in your
-browser with `chrome.storage.local`. It never leaves your device.
+**What the extension stores.** Only an in-memory marker (`chrome.storage.session`) that records
+when the current browser session started, so the startup cleanup knows how long to keep running.
+It is discarded when Chrome exits and never leaves your device.
 
 **Network.** The extension makes no network requests of any kind.
 

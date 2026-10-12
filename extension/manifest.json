@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Tab Group Nuker",
-  "version": "1.0.0",
-  "description": "Deletes every open tab group, clears restored groups at startup, and can auto-kill any group the moment it appears.",
+  "version": "1.1.0",
+  "description": "Deletes every open tab group on demand and clears the groups Chrome restores at startup.",
   "homepage_url": "https://github.com/yguooo/tab-group-nuker",
   "permissions": [
     "tabs",

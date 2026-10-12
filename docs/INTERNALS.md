@@ -61,6 +61,9 @@ In the extension API, `chrome.tabs.ungroup()` on every tab of a group removes th
 item shows a "this will delete the group" confirmation. The API path skips the dialog. Verified by
 ungrouping, quitting, and reading the store: the record is gone.
 
+Re-verified on Chrome for Testing 155 (2026-10-12, `test/run.sh`): after ungrouping, the
+`Sync Data/LevelDB` store holds 0 `saved_tab_group` records.
+
 Closing the last tab of a group is different: the group becomes a *closed saved group* and stays.
 There is no "before close" event, so the extension cannot convert a close into an ungroup.
 
@@ -69,7 +72,7 @@ There is no "before close" event, so the extension cannot convert a close into a
 `chrome.tabGroups.query` returns open groups only. Closed saved groups are not in
 `chrome.bookmarks` (the bookmarks-bar pills are a separate UI surface), not in `chrome.sessions`,
 and there is no method to open one. The only way for an extension to reach a closed group is for
-the user to click it; auto-kill mode exists for that.
+the user to click it.
 
 ## Running something when Chrome quits
 
@@ -104,3 +107,23 @@ then call `Extensions.loadUnpacked {path}` on the browser DevTools target, find 
 `service_worker` target in `/json`, and `Runtime.evaluate` against it (`nukeOpenGroups()` is a
 top-level function in the worker). Quit and run the wipe script with `CHROME_USER_DATA=/tmp/udd` to
 check the store.
+
+## Startup sweep (extension 1.1.0)
+
+Groups do not only come back through session restore. An auto-grouper such as "Tab Groups
+Extension" listens to `tabs.onCreated` and re-groups every restored tab by domain at each launch,
+so groups reappear on every start even after the saved records were deleted. A single pass at
+startup is therefore not enough; the extension sweeps once a second for two minutes.
+
+Trigger: `runtime.onStartup`, plus a fallback for the first service-worker run of a browser
+session (a `booted` marker in `storage.session`, which Chrome clears on exit). The fallback is
+skipped when `onInstalled` fired in the same run, so installing or updating mid-session does not
+silently ungroup anything. The sweep deadline lives in `storage.session` too, so a worker that
+Chrome kills mid-sweep resumes where it was.
+
+Measured in the harness: restored groups are gone within ~2 s of launch, all tabs survive, and
+the grouper does not re-group a tab that is merely activated or reloaded (it only reacts to new
+URL navigations), so there is no ping-pong after the window closes.
+
+Harness caveat: extensions loaded with `--load-extension` are reinstalled on every launch and
+never receive `onStartup`; the test triggers the sweep explicitly. Store installs do get it.
