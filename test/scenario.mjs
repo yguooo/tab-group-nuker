@@ -1,9 +1,13 @@
 const port = 9333, phase = process.argv[2];
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const targets = async () => (await fetch(`http://127.0.0.1:${port}/json`)).json();
+// Chrome for Testing 155 listens on [::1] only; older builds on 127.0.0.1.
+let host = "[::1]";
+const get = async (p) => { try { return await (await fetch(`http://${host}:${port}${p}`)).json(); } catch (e) { host = host === "[::1]" ? "127.0.0.1" : "[::1]"; return (await fetch(`http://${host}:${port}${p}`)).json(); } };
+const targets = () => get("/json");
 async function open(url) { const w = new WebSocket(url); await new Promise((r) => (w.onopen = r)); let i = 0; const pd = {};
-  w.onmessage = (e) => { const m = JSON.parse(e.data); if (m.id && pd[m.id]) pd[m.id](m); };
-  const c = (method, params) => new Promise((r) => { const n = ++i; pd[n] = r; w.send(JSON.stringify({ id: n, method, params })); });
+  w.onmessage = (e) => { const m = JSON.parse(e.data); if (m.id && pd[m.id]) { pd[m.id].r(m); delete pd[m.id]; } };
+  w.onclose = () => { for (const k of Object.keys(pd)) { pd[k].j(new Error("devtools socket closed: " + url)); delete pd[k]; } };
+  const c = (method, params) => new Promise((r, j) => { const n = ++i; pd[n] = { r, j }; w.send(JSON.stringify({ id: n, method, params })); });
   const ev = async (x) => { const r = await c("Runtime.evaluate", { expression: x, awaitPromise: true, returnByValue: true }); if (r.result?.exceptionDetails) throw new Error(JSON.stringify(r.result.exceptionDetails.exception?.description)); return r.result?.result?.value; };
   return { w, c, ev }; }
 async function findSW(name) { for (let i = 0; i < 60; i++) { for (const t of (await targets().catch(() => [])).filter((t) => t.type === "service_worker")) {
@@ -13,7 +17,7 @@ const tabsN = (k) => k.ev("chrome.tabs.query({}).then(t=>t.length)");
 const groupsDesc = (k) => k.ev("chrome.tabGroups.query({}).then(g=>g.map(x=>x.title).join('|'))");
 
 const nuker = await findSW("Tab Group Nuker");
-const closeBrowser = async () => { const b = await open((await (await fetch(`http://127.0.0.1:${port}/json/version`)).json()).webSocketDebuggerUrl); await b.c("Browser.close", {}); };
+const closeBrowser = async () => { const b = await open((await get("/json/version")).webSocketDebuggerUrl); await b.c("Browser.close", {}); };
 const show = async (tag) => console.log(tag, "tabs", await tabsN(nuker), "groups", await count(nuker), "[", await groupsDesc(nuker), "]");
 let fails = 0;
 const expect = (ok, msg) => { console.log((ok ? "PASS " : "FAIL ") + msg); if (!ok) fails++; };
