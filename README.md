@@ -34,13 +34,25 @@ to list, open, or delete them. They exist only in the profile's sync datastore o
 Chrome keeps locked while it runs. An extension also cannot run anything at quit time; Chrome kills
 its workers first.
 
-So the job is split in three parts. See [docs/INTERNALS.md](docs/INTERNALS.md) for how each works.
+So the job is split in three parts, plus one Chrome setting. See [docs/INTERNALS.md](docs/INTERNALS.md)
+for how each works.
+
+## The one Chrome setting that matters
+
+`chrome://settings/appearance` → turn **off** *Automatically pin new tab groups to the bookmarks
+bar*. Chrome still saves every group, but a group made by your auto-grouper is no longer pinned, so
+it never becomes a pill. The pills already there: right-click each → *Unpin* or *Delete group*, or
+let the quit hook below delete them all. Prefer an empty bar altogether? Turn off *Show tab groups
+in bookmarks bar* as well.
+
+This is the only part that cannot race with anything. Do it first; the rest of this repo keeps the
+saved-group *list* (the "Tab groups" menu, and what syncs to your other devices) from growing.
 
 ## Parts
 
 | Part | What it does | Needs |
 |---|---|---|
-| `extension/` | Deletes all **open** groups on demand; ungroups whatever session-restore brings back at startup | Chrome, load unpacked |
+| `extension/` | Deletes all **open** groups on demand (button or `⌘⇧X`) | Chrome, load unpacked |
 | `wipe-saved-groups.mjs` | Deletes all saved groups, **open or closed**, from the profile store on disk, with a backup | Node 20+, Chrome quit |
 | `launchd/` + `install.sh` | Runs the wipe automatically every time Chrome quits. No resident process | macOS |
 
@@ -58,9 +70,12 @@ group, the same as Chrome's own *Ungroup* menu item, just without the confirmati
 What you get:
 
 - Toolbar button → **Delete all open groups**, or press `⌘⇧X` / `Ctrl+Shift+X`.
-- On every Chrome start it keeps ungrouping, for two minutes, whatever session-restore brings back
-  (and whatever an auto-grouper re-creates as restored tabs load), so a launch always begins with
-  zero groups.
+
+That is all it does, on purpose. Earlier versions also swept groups at startup; with an
+auto-grouper running, the tabs API cannot tell a tab Chrome restored from one you opened a second
+ago, and the sweep kept deleting the group the auto-grouper had just made. The automatic part of the
+job (clearing the groups Chrome keeps when it quits) is done by the quit hook below, not by the
+extension.
 
 Run `test/run.sh` to see the whole cycle against the real "Tab Groups Extension" in a throwaway
 Chrome for Testing profile (needs node and ~200 MB for the browser download).
@@ -87,14 +102,36 @@ Chrome, run `--all --delete`, relaunch.
 ### 3. Automatic wipe on quit (macOS)
 
 ```sh
-./install.sh
+./install.sh        # from a checkout, or in one line without cloning:
+curl -fsSL https://raw.githubusercontent.com/yguooo/tab-group-nuker/main/install.sh | bash
 ```
 
-This copies the script and its dependency to `~/.tab-group-nuker/` and registers a launchd
-*WatchPaths* job on Chrome's `SingletonLock`, a file Chrome creates at launch and removes at quit.
-launchd runs the job on each change: while Chrome is up it just logs the on-disk count; once Chrome
-is gone it wipes every profile. Nothing stays running in between. launchd cannot read `~/Desktop`
-or `~/Documents`, which is why the files are copied out of the repo.
+This copies the script, its dependency and a private copy of the `node` binary to
+`~/.tab-group-nuker/` and registers a launchd *WatchPaths* job on Chrome's `SingletonLock`, a file
+Chrome creates at launch and removes at quit. launchd runs the job on each change: it polls for
+Chrome's browser process every 200 ms and, the moment it is gone, wipes every profile; if Chrome is
+still up after a minute it just logs the on-disk count. Nothing stays running in between. launchd
+cannot read `~/Desktop` or `~/Documents`, which is why the files are copied out of the repo.
+
+Chrome removes the lock early in its shutdown and the process can take a few seconds to exit, so
+the wipe happens a few seconds *after* ⌘Q. Relaunch Chrome within that window and it loads the
+groups before they are deleted; the log then says so (`Chrome was relaunched while the wipe ran`).
+Chrome restarting itself (`chrome://restart`, *Relaunch to update*) is the same race. Give it a
+few seconds, or just quit again. The hook ignores Chrome's relauncher helper so a restart still
+counts as a quit.
+
+**Then one click only you can do.** Recent macOS blocks other programs from
+`~/Library/Application Support/Google/Chrome`, and no program can grant itself that access. The
+installer opens System Settings → Privacy & Security → Full Disk Access and puts the path on your
+clipboard: click `+`, press ⌘⇧G, paste, Return, switch `node` on. macOS ties the permission to the
+program launchd starts, which is why the job starts `node` directly rather than through a shell, and
+uses its own copy of `node` so a Homebrew upgrade cannot invalidate the grant. Until then every run
+logs `EPERM` and nothing is deleted.
+
+If you only want the extension: set Chrome → On startup → *Continue where you left off* and skip
+parts 2 and 3; every group open at quit comes back at launch and the extension deletes it. Parts 2
+and 3 exist for people who start Chrome on a blank New Tab page, where Chrome never reopens those
+groups.
 
 ```sh
 tail ~/.tab-group-nuker-backups/quit.log      # see it work
@@ -105,16 +142,27 @@ Backups accumulate, one folder per profile per quit. They are small; delete old 
 
 ## Day-to-day
 
-Install all three parts once, then do nothing. Every quit wipes the pile, every launch clears what
-session-restore brought back, and your auto-grouper starts fresh. If you only install the script,
-run it whenever the bookmarks bar fills up.
+Flip the Appearance setting, install the three parts once, then do nothing. Groups form while you
+browse, nothing is pinned, every quit wipes the pile, and your auto-grouper starts fresh. If you
+only install the script, run it whenever the "Tab groups" menu fills up.
+
+`~/.tab-group-nuker-backups/quit.log` tells you what happened at each quit:
+
+- `chrome quit -> wiping` … `deleted N records` — worked.
+- `chrome running, skip` — Chrome was still up a minute after the trigger (a launch, or Chrome
+  writing to its folder; launchd also fires on those). Normal.
+- `Chrome was relaunched while the wipe ran` — see part 3; quit again.
+- `EPERM` — Full Disk Access not granted to `~/.tab-group-nuker/node`.
 
 ## Sync caveats
 
-- The wipe keeps the store's sync progress marker, so Chrome does not re-download the deleted
-  groups from the server at next start.
+- If the profile syncs tab groups to a Google account, groups the wipe deleted locally can come
+  back from the account (the wipe never tells the server). Groups then seem to survive one quit and
+  vanish after the next. **Turn off tab sync for the profile** (*Open tabs* / *Tabs* in
+  `chrome://settings/syncSetup/advanced`) and the wipe is final on the first quit. With the
+  Appearance setting above they come back unpinned at worst, never as pills.
 - Other signed-in devices still hold their copies and will push changes back if a group is touched
-  there. Run the wipe on each device, or turn off *Open tabs* in `chrome://settings/syncSetup/advanced`.
+  there. Run the wipe on each device, or turn off tab sync as above.
 - Shared tab groups (`shared_tab_group_data` entities) are left alone.
 
 ## Tested on

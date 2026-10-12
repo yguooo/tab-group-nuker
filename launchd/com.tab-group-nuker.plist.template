@@ -2,12 +2,14 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
   <key>Label</key><string>com.tab-group-nuker</string>
+  <!-- node is started directly (a private copy at a stable path) so that the Full Disk Access
+       grant applies to it and survives Homebrew upgrades. -->
   <key>ProgramArguments</key><array>
-    <string>/bin/bash</string>
-    <string>__HOME__/.tab-group-nuker/on-chrome-quit.sh</string>
+    <string>__HOME__/.tab-group-nuker/node</string>
+    <string>__HOME__/.tab-group-nuker/on-chrome-quit.mjs</string>
   </array>
   <key>EnvironmentVariables</key><dict>
-    <key>PATH</key><string>__NODE_DIR__:/usr/local/bin:/usr/bin:/bin</string>
+    <key>PATH</key><string>/usr/local/bin:/usr/bin:/bin</string>
   </dict>
   <key>WatchPaths</key><array>
     <string>__HOME__/Library/Application Support/Google/Chrome/SingletonLock</string>

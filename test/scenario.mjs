@@ -13,33 +13,35 @@ const tabsN = (k) => k.ev("chrome.tabs.query({}).then(t=>t.length)");
 const groupsDesc = (k) => k.ev("chrome.tabGroups.query({}).then(g=>g.map(x=>x.title).join('|'))");
 
 const nuker = await findSW("Tab Group Nuker");
-if (phase === "C") {
-  await sleep(3000); console.log("C: after 3rd launch: tabs", await tabsN(nuker), "groups", await count(nuker), "[", await groupsDesc(nuker), "]");
-  const b = await open((await (await fetch(`http://127.0.0.1:${port}/json/version`)).json()).webSocketDebuggerUrl); await b.c("Browser.close", {});
-} else if (phase === "A") {
+const closeBrowser = async () => { const b = await open((await (await fetch(`http://127.0.0.1:${port}/json/version`)).json()).webSocketDebuggerUrl); await b.c("Browser.close", {}); };
+const show = async (tag) => console.log(tag, "tabs", await tabsN(nuker), "groups", await count(nuker), "[", await groupsDesc(nuker), "]");
+let fails = 0;
+const expect = (ok, msg) => { console.log((ok ? "PASS " : "FAIL ") + msg); if (!ok) fails++; };
+
+if (phase === "A") {
   const grouper = await findSW("GROUPER");
   await grouper.ev(`chrome.storage.sync.set({"r-groupByDomain":true,"r-scope":"all"})`);
   await grouper.ev(`updateRules()`); await sleep(500);
-  for (const u of ["https://example.com/", "https://example.com/a", "https://www.wikipedia.org/", "https://www.wikipedia.org/#x", "https://github.com/", "https://github.com/about"])
-    await nuker.ev(`chrome.tabs.create({url:${JSON.stringify(u)},active:false}).then(t=>t.id)`);
-  await sleep(10000);
-  console.log("A: tabs", await tabsN(nuker), "groups", await count(nuker), "[", await groupsDesc(nuker), "]", "nuker session:", JSON.stringify(await nuker.ev("chrome.storage.session.get(null)")));
-  const b = await open((await (await fetch(`http://127.0.0.1:${port}/json/version`)).json()).webSocketDebuggerUrl);
-  await b.c("Browser.close", {}); console.log("A: browser closed gracefully");
+  const add = async (urls) => { for (const u of urls) await nuker.ev(`chrome.tabs.create({url:${JSON.stringify(u)},active:false}).then(t=>t.id)`); await sleep(8000); };
+  await add(["https://example.com/", "https://example.com/a", "https://www.wikipedia.org/", "https://www.wikipedia.org/#x"]);
+  await show("A: grouper done:");
+  expect((await count(nuker)) >= 2, "A: grouper created groups");
+  const before = await tabsN(nuker);
+  console.log("A: nuke:", JSON.stringify(await nuker.ev("nukeOpenGroups()")));
+  await sleep(1000); await show("A: after nuke:");
+  expect((await count(nuker)) === 0, "A: zero groups after nuke");
+  expect((await tabsN(nuker)) === before, "A: all tabs kept");
+  await add(["https://github.com/", "https://github.com/about"]);
+  await show("A: new site after nuke:");
+  expect((await count(nuker)) >= 1, "A: grouper still groups new tabs (nuker does not fight it)");
+  await sleep(2000);
+  expect((await count(nuker)) >= 1, "A: that group survives in-session");
+  console.log(`A: ${fails} failures; quitting with groups open so Chrome saves them`);
+  await closeBrowser();
 } else {
-  console.log("B: nuker session before:", JSON.stringify(await nuker.ev("chrome.storage.session.get(null)")));
-  console.log("B: groups restored by session restore:", await count(nuker), "[", await groupsDesc(nuker), "]");
-  await nuker.ev('beginStartupSweep("harness: --load-extension never delivers onStartup")');
-  for (let t = 0; t <= 20; t += 2) { console.log(`B: t=${t}s tabs`, await tabsN(nuker), "groups", await count(nuker), "[", await groupsDesc(nuker), "]"); await sleep(2000); }
-  console.log("B: activate each restored tab (simulates user clicking lazy tabs; grouper re-groups on load)");
-  const ids = await nuker.ev("chrome.tabs.query({}).then(t=>t.map(x=>x.id))");
-  for (const id of ids) { await nuker.ev(`chrome.tabs.update(${id},{active:true}).then(()=>1)`); await sleep(700); }
-  for (let t = 0; t <= 10; t += 2) { console.log(`B: after clicks t=${t}s groups`, await count(nuker), "[", await groupsDesc(nuker), "]"); await sleep(2000); }
-  const final = await count(nuker); console.log(final === 0 ? "B: PASS zero groups" : "B: FAIL groups remain");
-  console.log("B: wait for sweep window to end, then click tabs again (grouper should win now, by design)");
-  await nuker.ev("chrome.storage.session.set({sweepUntil:0})"); await sleep(1500);
-  for (const id of ids) { await nuker.ev(`chrome.tabs.update(${id},{active:true}).then(()=>1)`); await nuker.ev(`chrome.tabs.reload(${id}).then(()=>1)`); await sleep(1200); }
-  await sleep(3000); console.log("B: after sweep ended + reloads: groups", await count(nuker), "[", await groupsDesc(nuker), "]");
-  const b = await open((await (await fetch(`http://127.0.0.1:${port}/json/version`)).json()).webSocketDebuggerUrl); await b.c("Browser.close", {});
+  await sleep(3000); await show("C: relaunch on blank page:");
+  expect((await count(nuker)) === 0, "C: zero groups after wipe + relaunch");
+  console.log(`C: ${fails} failures`);
+  await closeBrowser();
 }
-process.exit(0);
+process.exit(fails ? 1 : 0);

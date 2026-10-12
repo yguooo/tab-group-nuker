@@ -73,8 +73,17 @@ function profiles() {
 const chromeRunning = () => {
   try {
     if (process.platform === "win32") return execSync("tasklist", { encoding: "utf8" }).includes("chrome.exe");
-    execSync(process.platform === "darwin" ? 'pgrep -x "Google Chrome"' : "pgrep -x chrome", { stdio: "ignore" });
-    return true;
+    const ps = execSync("ps -axo args=", { encoding: "utf8" }).split("\n");
+    // A non-default user data dir (tests, Chrome for Testing) is locked only by the Chrome that
+    // was started on it.
+    if (process.env.CHROME_USER_DATA) return ps.some((l) => l.includes(`--user-data-dir=${process.env.CHROME_USER_DATA}`));
+    if (process.platform === "darwin") {
+      // The main browser process only: helpers are another executable, the short-lived
+      // relauncher (same executable, --type=relauncher) must not count, nor does
+      // "Google Chrome for Testing".
+      return ps.some((l) => /\/Contents\/MacOS\/Google Chrome(\s-|$)/.test(l) && !/ --type=/.test(l));
+    }
+    return ps.some((l) => /(^|\/)(google-)?chrome(\s-|$)/.test(l) && !/ --type=/.test(l));
   } catch { return false; }
 };
 

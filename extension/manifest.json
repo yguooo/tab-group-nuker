@@ -1,13 +1,12 @@
 {
   "manifest_version": 3,
   "name": "Tab Group Nuker",
-  "version": "1.1.0",
-  "description": "Deletes every open tab group on demand and clears the groups Chrome restores at startup.",
+  "version": "1.2.0",
+  "description": "Deletes every open tab group with one click or a shortcut. Pair with the repo's quit hook to clear the saved groups Chrome keeps when it quits.",
   "homepage_url": "https://github.com/yguooo/tab-group-nuker",
   "permissions": [
     "tabs",
-    "tabGroups",
-    "storage"
+    "tabGroups"
   ],
   "background": {
     "service_worker": "background.js"

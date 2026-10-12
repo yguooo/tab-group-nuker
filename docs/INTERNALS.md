@@ -108,22 +108,29 @@ then call `Extensions.loadUnpacked {path}` on the browser DevTools target, find 
 top-level function in the worker). Quit and run the wipe script with `CHROME_USER_DATA=/tmp/udd` to
 check the store.
 
-## Startup sweep (extension 1.1.0)
+## Why there is no startup sweep (extension 1.2.0)
 
-Groups do not only come back through session restore. An auto-grouper such as "Tab Groups
-Extension" listens to `tabs.onCreated` and re-groups every restored tab by domain at each launch,
-so groups reappear on every start even after the saved records were deleted. A single pass at
-startup is therefore not enough; the extension sweeps once a second for two minutes.
+Version 1.1.0 ungrouped everything for two minutes after launch, to undo what session restore and
+the auto-grouper brought back. With "On startup: Open the New Tab page" nothing is restored, and
+the sweep then only fought the auto-grouper: the tabs API cannot tell a tab Chrome restored from a
+tab you just opened (creation time windows, `lastAccessed` and `status == "unloaded"` all misfire;
+a brand-new tab passes through `unloaded` too), so the first group you made after launch kept
+getting deleted. 1.2.0 removed it. The extension is now manual only; the quit hook is the automatic
+part.
 
-Trigger: `runtime.onStartup`, plus a fallback for the first service-worker run of a browser
-session (a `booted` marker in `storage.session`, which Chrome clears on exit). The fallback is
-skipped when `onInstalled` fired in the same run, so installing or updating mid-session does not
-silently ungroup anything. The sweep deadline lives in `storage.session` too, so a worker that
-Chrome kills mid-sweep resumes where it was.
+## Quit hook timing
 
-Measured in the harness: restored groups are gone within ~2 s of launch, all tabs survive, and
-the grouper does not re-group a tab that is merely activated or reloaded (it only reacts to new
-URL navigations), so there is no ping-pong after the window closes.
+launchd fires the job when `SingletonLock` changes. Chrome removes that symlink early in shutdown
+and the browser process can stay alive for several seconds afterwards, finishing its writes. The
+job polls for the browser process (the `Contents/MacOS/Google Chrome` executable with no `--type=`
+argument; helpers and Chrome's `--type=relauncher` do not count) every 200 ms, and wipes the
+instant it is gone: a process that has exited has no pending writes, so there is nothing to settle.
 
-Harness caveat: extensions loaded with `--load-extension` are reinstalled on every launch and
-never receive `onStartup`; the test triggers the sweep explicitly. Store installs do get it.
+The race that remains is a relaunch before the wipe lands. Chrome reads the saved-group store
+during profile start-up and writes it back later, so a Chrome started inside that window brings
+every group back from memory. Symptoms: `chrome running, skip` right after a quit, or the explicit
+`Chrome was relaunched while the wipe ran` line. The fix is on the user's side (wait a few seconds,
+or quit again); a WatchPaths job cannot hold Chrome back. launchd also fires the job on unrelated
+writes inside the Chrome folder (the lock is a dangling symlink, so launchd watches the directory),
+which is why the log shows `triggered` while Chrome is simply running; each of those costs a
+minute of polling and nothing else.

@@ -1,11 +1,11 @@
 #!/bin/bash
-# End-to-end check of the extension against the real "Tab Groups Extension" auto-grouper.
+# End-to-end check against the real "Tab Groups Extension" auto-grouper, in a throwaway profile.
 # Downloads Chrome for Testing + the grouper CRX into ./test/.work, then:
-#   A: open sites, let the grouper create groups, quit
-#   B: relaunch with session restore, run the startup sweep, expect 0 groups and all tabs kept
-#   C: relaunch again to show the grouper re-groups restored tabs at every launch
-# Note: --load-extension reinstalls the extension on each launch, so Chrome never fires
-# runtime.onStartup here; phase B triggers the sweep explicitly. Store installs get onStartup.
+#   A: open sites, let the grouper group them, nuke (expect 0 groups, all tabs kept), open more
+#      sites and check the grouper still groups them (the nuker must not fight it), quit with the
+#      groups open so Chrome saves them
+#   B: with Chrome quit, run wipe-saved-groups.mjs on the profile (expect records deleted)
+#   C: relaunch on a blank page (no session restore, like "Open the New Tab page"): expect 0 groups
 set -e
 cd "$(dirname "$0")"; W="$PWD/.work"; mkdir -p "$W/grouper"
 EXT="$(cd ../extension && pwd)"
@@ -22,6 +22,7 @@ fi
 rm -rf "$W/prof"; mkdir -p "$W/prof"
 C=(--user-data-dir="$W/prof" --load-extension="$EXT,$W/grouper" --remote-debugging-port=9333 --no-first-run --no-default-browser-check --window-size=900,600)
 launch() { "$BIN" "${C[@]}" "$@" >/dev/null 2>&1 & sleep 5; }
-launch about:blank;            node scenario.mjs A; sleep 3; pkill -f "user-data-dir=$W/prof" || true; sleep 2
-launch --restore-last-session; node scenario.mjs B; sleep 3; pkill -f "user-data-dir=$W/prof" || true; sleep 2
-launch --restore-last-session; node scenario.mjs C; sleep 2; pkill -f "user-data-dir=$W/prof" || true
+launch about:blank; node scenario.mjs A; sleep 3; pkill -f "user-data-dir=$W/prof" || true; sleep 2
+echo "B: on disk after quit:"; CHROME_USER_DATA="$W/prof" node ../wipe-saved-groups.mjs --all --delete
+echo "B: on disk after wipe:"; CHROME_USER_DATA="$W/prof" node ../wipe-saved-groups.mjs | grep -v "dry run"
+launch about:blank; node scenario.mjs C; sleep 2; pkill -f "user-data-dir=$W/prof" || true

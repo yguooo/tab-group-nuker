@@ -1,3 +1,5 @@
 node_modules/
 .DS_Store
 tab-group-nuker-extension.zip
+extension/diag.html
+extension/diag.js
