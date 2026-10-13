@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Tab Group Nuker",
   "version": "1.2.0",
-  "description": "Deletes every open tab group with one click or a shortcut. Pair with the repo's quit hook to clear the saved groups Chrome keeps when it quits.",
+  "description": "Deletes every open tab group with one click or a shortcut. Pair with the repo's quit hook to clear saved groups when Chrome quits.",
   "homepage_url": "https://github.com/yguooo/tab-group-nuker",
   "permissions": [
     "tabs",
